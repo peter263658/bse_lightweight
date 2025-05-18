@@ -1,0 +1,15 @@
+model: ${model}
+training:
+  batch_size: 16
+  n_epochs: 50
+  learning_rate: 0.0001
+  n_workers: 4
+  pin_memory: true
+  accelerator: auto
+  strategy: auto
+dataset:
+  clean_dir: /path/to/clean
+  noise_dir: /path/to/noise
+  rir_dir: /path/to/CIPIC
+eval:
+  ckpt_path: null

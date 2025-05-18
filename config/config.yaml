@@ -1,14 +1,15 @@
-# 資料路徑（示意，請自行改成真實路徑）
 dataset:
-  clean_dir: /path/to/clean
-  noise_dir: /path/to/noise
-  rir_dir:   /path/to/CIPIC
-
+  noisy_test_dataset_dir: /raid/R12K41024/LBCCN/Dataset/noisy_testset/snr_0dB
+  noisy_training_dataset_dir: /raid/R12K41024/LBCCN/Dataset/noisy_trainset
+  noisy_validation_dataset_dir: /raid/R12K41024/LBCCN/Dataset/noisy_valset
+  target_test_dataset_dir: /raid/R12K41024/LBCCN/Dataset/clean_testset
+  target_training_dataset_dir: /raid/R12K41024/LBCCN/Dataset/clean_trainset
+  target_validation_dataset_dir: /raid/R12K41024/LBCCN/Dataset/clean_valset
 defaults:
-  - model
-  - training
+- model
+- training
+- dataset: speech_dataset
 
-model: ${model}
 
 # 評估階段用的 checkpoint（正式 train 完再填）
 eval:
