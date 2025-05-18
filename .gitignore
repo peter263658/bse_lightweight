@@ -47,3 +47,5 @@ Dataset/
 # Git
 *.orig
 EOF
+
+outputs/*

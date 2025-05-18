@@ -12,7 +12,7 @@ def create_torch_dataloaders(config):
 
 
 def create_torch_dataloader(config, mode):
-    is_binaural = config["model"]["binaural"]
+    is_binaural = True
 
     if mode == "training":
         noisy_dataset_path = config["dataset"]["noisy_training_dataset_dir"]

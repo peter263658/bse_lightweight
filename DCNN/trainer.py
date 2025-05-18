@@ -37,16 +37,16 @@ class DCNNLightningModule(BaseLightningModule):
     def __init__(self, config):
         config = OmegaConf.to_container(config)
         self.config = config
-        
+
         model = Model(**self.config["model"])
         loss = BinauralLoss(
         
-            ild_weight=self.config["model"]["ild_weight"],
-            ipd_weight=self.config["model"]["ipd_weight"],
+            ild_weight=self.config["loss"]["ild_weight"],
+            ipd_weight=self.config["loss"]["ipd_weight"],
             
-            stoi_weight=config["model"]["stoi_weight"],
+            stoi_weight=self.config["loss"]["stoi_weight"],
             
-            snr_loss_weight=self.config["model"]["snr_loss_weight"],
+            snr_loss_weight=self.config["loss"]["snr_loss_weight"],
             
             )
 

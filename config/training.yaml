@@ -10,6 +10,3 @@ training:
   accelerator:         auto
   strategy:            auto
 
-  # （可選）不用 early stopping，就拿滿 50 epochs
-  # early_stopping:
-  #   enabled: false

@@ -6,11 +6,38 @@ dataset:
   target_training_dataset_dir: /raid/R12K41024/LBCCN/Dataset/clean_trainset
   target_validation_dataset_dir: /raid/R12K41024/LBCCN/Dataset/clean_valset
 defaults:
-- model
 - training
 - dataset: speech_dataset
 
+model:
+  band_num: 40
+
+loss:
+  ild_weight: 1        # Weight for ILD loss (γ)
+  ipd_weight: 10       # Weight for IPD loss (κ)
+  snr_loss_weight: 1   # Weight for SNR loss (α)
+  stoi_weight: 10      # Weight for STOI loss (β)
 
 # 評估階段用的 checkpoint（正式 train 完再填）
 eval:
   ckpt_path: null
+
+training:
+  accelerator: auto
+  batch_size: 32
+  # learning_rate: 0.001  # Initial learning rate as per paper
+  learning_rate: 0.0001  # Initial learning rate as per paper
+  learning_rate_decay_steps: [3, 8]
+  learning_rate_decay_values: 0.5
+  n_epochs: 100         # Number of epochs as per paper
+  n_workers: 4
+  pin_memory: true
+  strategy: auto
+  train_checkpoint_path: null
+  logger: true
+  early_stopping:
+    enabled: true
+    key_to_monitor: validation_loss
+    min_delta: 0.01
+    # patience_in_epochs: 3  # Early stopping after 3 epochs of no improvement
+    patience_in_epochs: 8  # Early stopping after 3 epochs of no improvement
