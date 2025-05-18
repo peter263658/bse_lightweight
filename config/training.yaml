@@ -1,37 +1,15 @@
-# training:
-#   batch_size: 8
-#   n_epochs: 20
-#   learning_rate: 0.0001
-#   learning_rate_decay_steps: [3, 8]
-#   learning_rate_decay_values: 0.5
-#   n_workers: 2
-
-#   # test_checkpoint_path: None #/Users/vtokala/Documents/Research/di_nn/DCNN/checkpoints/weights-epoch=35-validation_loss=-0.61.ckpt # Model to be used when analyzing the results
-#   # train_checkpoint_path: None #/Users/ezajlerg/src/SE_DCNN/demo/weights-epoch=19-validation_loss=-17.90.ckpt # Start training using this pretrained model
-
-#   strategy: ddp # defines how data is shared when using multiple GPUs 
-#   pin_memory: False
-#   accelerator: null
-#   early_stopping:
-#     enabled: True
-#     key_to_monitor: validation_loss
-#     min_delta: 0.01
-#     patience_in_epochs: 3
-
 training:
-  batch_size: 16
-  n_epochs: 100
-  learning_rate: 0.001
-  learning_rate_decay_steps: [3, 8]
-  learning_rate_decay_values: 0.5
-  n_workers: 4
-  test_checkpoint_path: /raid/R12K41024/BCCTN/DCNN/Checkpoints/Trained_model.ckpt # Model to be used when analyzing the results
-  train_checkpoint_path: /raid/R12K41024/BCCTN/DCNN/Checkpoints/Trained_model.ckpt # Start training using this pretrained model
-  strategy: auto 
-  pin_memory: true
-  accelerator: auto
-  early_stopping:
-    enabled: true
-    key_to_monitor: validation_loss
-    min_delta: 0.01
-    patience_in_epochs: 3
+  # --- Training schedule ---
+  batch_size:          16      # LBCCN paper 建議輕量 batch :contentReference[oaicite:24]{index=24}:contentReference[oaicite:25]{index=25}
+  n_epochs:            50      # 20–50 epochs :contentReference[oaicite:26]{index=26}:contentReference[oaicite:27]{index=27}
+  learning_rate:       0.0001  # Adam 初始 LR :contentReference[oaicite:28]{index=28}:contentReference[oaicite:29]{index=29}
+
+  # --- DataLoader & Accelerator ---
+  n_workers:           4
+  pin_memory:          true
+  accelerator:         auto
+  strategy:            auto
+
+  # （可選）不用 early stopping，就拿滿 50 epochs
+  # early_stopping:
+  #   enabled: false

@@ -1,0 +1,19 @@
+# 原本的 DCNN/BTCCN 參數都刪掉，改成純 LBCCN
+model:
+  model_type: lbccn
+  # --- STFT parameters ---
+  n_dft:        256      # 256-point FFT :contentReference[oaicite:10]{index=10}:contentReference[oaicite:11]{index=11}
+  hop_size:     128      # 8 ms hop :contentReference[oaicite:12]{index=12}:contentReference[oaicite:13]{index=13}
+  win_length:   256      # 16 ms window :contentReference[oaicite:14]{index=14}:contentReference[oaicite:15]{index=15}
+  onesided:     true
+  normalized:   true
+
+  # --- Frequency band selection ---
+  band_num:     40       # lowest 40 bins :contentReference[oaicite:16]{index=16}:contentReference[oaicite:17]{index=17}
+
+  # --- LightConv block counts ---
+  lightconv1d_blocks: 2 # M = 2 LightConv1D :contentReference[oaicite:18]{index=18}:contentReference[oaicite:19]{index=19}
+  lightconv2d_blocks: 3 # N = 3 LightConv2D :contentReference[oaicite:20]{index=20}:contentReference[oaicite:21]{index=21}
+
+  # --- Clean vs Noise 權重 ---
+  signal_weight_k: 0.5   # k = 0.5 :contentReference[oaicite:22]{index=22}:contentReference[oaicite:23]{index=23}
