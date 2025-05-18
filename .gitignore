@@ -1,0 +1,49 @@
+./Dataset/*
+./examples/*
+./DCNN/Checkpoint/*
+
+cat << EOF > .gitignore
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+
+# Data
+*.npy
+*.npz
+*.csv
+*.wav
+*.mp3
+*.flac
+*.mat
+*.pkl
+*.json
+*.h5
+
+# Models & checkpoints
+*.ckpt
+*.pt
+*.pth
+checkpoints/
+runs/
+logs/
+
+# Dataset
+data/
+Dataset/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS / Editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Git
+*.orig
+EOF
