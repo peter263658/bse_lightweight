@@ -29,20 +29,22 @@ class BaseDataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.noisy_file_paths)
 
+    # ── DCNN/datasets/base_dataset.py ─────────────────────────────
     def __getitem__(self, index):
-        clean_audio_sample_path = self.target_file_paths[index]
-        noisy_audio_sample_path = self.noisy_file_paths[index]
-        #path = os.path.dirname(self.audio_dir)
-        clean_signal, _ = torchaudio.load(clean_audio_sample_path)
-        # breakpoint()
+        clean_path = self.target_file_paths[index]   # x
+        noisy_path = self.noisy_file_paths[index]    # x + n
 
-        noisy_signal, _ = torchaudio.load(noisy_audio_sample_path)
-        
+        clean, _ = torchaudio.load(clean_path)
+        noisy, _ = torchaudio.load(noisy_path)
+
+        # 依 LBCCN 資料生成規則，mixture = clean + noise
+        noise = noisy - clean                       # n
 
         if self.mono:
-            return (noisy_signal[0], clean_signal[0])
+            return noisy[0], clean[0], noise[0]     # (mix, voice_t, noise_t)
         else:
-            return (noisy_signal, clean_signal)
+            return noisy, clean, noise
+
 
     def _get_file_paths(self, dataset_dir):
         # Convert to Path object if it's a string

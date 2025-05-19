@@ -5,7 +5,7 @@
 # MODEL_CHECKPOINT="/raid/R12K41024/BCCTN/outputs/2025-05-10/19-39-07/logs/lightning_logs/version_0/checkpoints/epoch=98-step=95832.ckpt" # current best
 # MODEL_CHECKPOINT="/raid/R12K41024/BCCTN/outputs/2025-05-10/19-39-07/logs/lightning_logs/version_0/checkpoints/last.ckpt"
 # MODEL_CHECKPOINT="/raid/R12K41024/BCCTN/outputs/2025-05-11/16-34-17/logs/lightning_logs/version_0/checkpoints/epoch=94-step=91960.ckpt"
-MODEL_CHECKPOINT="/raid/R12K41024/BCCTN/outputs/2025-05-12/15-30-55/logs/lightning_logs/version_0/checkpoints/epoch=89-step=87120.ckpt" 
+MODEL_CHECKPOINT="/raid/R12K41024/LBCCN/outputs/2025-05-19/03-42-47/logs/lightning_logs/version_0/checkpoints/last.ckpt" 
 # MODEL_CHECKPOINT="/raid/R12K41024/BCCTN/outputs/2025-05-12/15-30-55/logs/lightning_logs/version_0/checkpoints/last.ckpt"
 # MODEL_CHECKPOINT="/raid/R12K41024/BCCTN/outputs/2025-05-16/04-19-55/logs/lightning_logs/version_0/checkpoints/epoch=98-step=95832.ckpt"
 VCTK_NOISY_DIR="/raid/R12K41024/BCCTN/Dataset/noisy_testset"
@@ -28,13 +28,13 @@ CUDA_VISIBLE_DEVICES=5 python eval.py \
     --output_dir "${OUTPUT_DIR}/vctk_paper_style" \
     --paper_style_eval \
     --batch_size 8 \
-    --limit_pairs 750
+    --limit_pairs 10
 
-# Step 3: Generate comparison table between our results and paper results
-echo "Generating comparison table..."
-CUDA_VISIBLE_DEVICES=5 python compare_results.py \
-    --vctk_results "${OUTPUT_DIR}/vctk_paper_style/vctk_paper_style_results.csv" \
-    --timit_results "${OUTPUT_DIR}/timit_paper_style/timit_paper_style_results.csv" \
-    --output_file "${OUTPUT_DIR}/comparison_with_paper.csv"
+# # Step 3: Generate comparison table between our results and paper results
+# echo "Generating comparison table..."
+# CUDA_VISIBLE_DEVICES=5 python compare_results.py \
+#     --vctk_results "${OUTPUT_DIR}/vctk_paper_style/vctk_paper_style_results.csv" \
+#     --timit_results "${OUTPUT_DIR}/timit_paper_style/timit_paper_style_results.csv" \
+#     --output_file "${OUTPUT_DIR}/comparison_with_paper.csv"
 
-echo "Evaluation complete! Results are saved in ${OUTPUT_DIR}"
+# echo "Evaluation complete! Results are saved in ${OUTPUT_DIR}"

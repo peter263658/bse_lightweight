@@ -61,3 +61,29 @@ class DCNNLightningModule(BaseLightningModule):
         scheduler = MultiStepLR(optimizer, decay_step, decay_value)
 
         return [optimizer], [scheduler]
+# ── DCNN/trainer.py ────────────────────
+    def _step(
+        self,
+        batch,
+        batch_idx: int,
+        log_model_output: bool = False,
+        log_labels: bool = True,
+    ):
+        mix, voice_t, noise_t = batch
+        voice, noise, vlc, vrc, nlc, nrc = self.model(mix)
+
+        total_loss, metrics = self.loss(
+            voice, noise, vlc, vrc, nlc, nrc,
+            voice_t, noise_t
+        )
+
+        # 1) Lightning logging
+        self.log("loss", total_loss, prog_bar=True, sync_dist=True)
+        for k, v in metrics.items():
+            self.log(k, v, prog_bar=False, sync_dist=True)
+
+        # 2) 回傳 dict，給 BaseLightningModule 收集做 epoch 統計
+        output_dict = {"loss": total_loss}
+        output_dict.update(metrics)
+        return output_dict
+

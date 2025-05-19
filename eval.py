@@ -501,9 +501,19 @@ def safe_evaluate_file(clean_path, noisy_path, model, device):
         # Process through model - create batch tensor [1, 2, samples]
         noisy_tensor = torch.tensor(noisy_data.T, dtype=torch.float32).unsqueeze(0).to(device)
         
-        # Run through model
+        # # Run through model
+        # with torch.no_grad():
+        #     enhanced_tensor = model(noisy_tensor)
+        #     enhanced_data = enhanced_tensor.cpu().numpy()[0]  # [2, samples]
+
         with torch.no_grad():
-            enhanced_tensor = model(noisy_tensor)
+            out = model(noisy_tensor)
+            # 如果模型返回 tuple，则第 0/1 元素分别是 (voice, noise)
+            if isinstance(out, tuple):
+                # 这里我们只取 voice, 即增强后的双通道语音
+                enhanced_tensor = out[0]
+            else:
+                enhanced_tensor = out
             enhanced_data = enhanced_tensor.cpu().numpy()[0]  # [2, samples]
             
         # Ensure enhanced data matches the original clean length

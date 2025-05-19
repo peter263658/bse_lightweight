@@ -79,7 +79,7 @@ class BinauralLoss(Module):
            
             voice_bin_snr_loss = self.snr_loss_weight*voice_snr_loss_lr
             
-            print('\n Voice SNR Loss = ', voice_bin_snr_loss)
+            # print('\n Voice SNR Loss = ', voice_bin_snr_loss)
             loss += voice_bin_snr_loss
 
             snr_l = snr_loss(noise[:, 0], noise_target[:, 0])
@@ -89,7 +89,7 @@ class BinauralLoss(Module):
            
             noise_bin_snr_loss = self.snr_loss_weight*noise_snr_loss_lr
             
-            print('\n Noise SNR Loss = ', noise_bin_snr_loss)
+            # print('\n Noise SNR Loss = ', noise_bin_snr_loss)
             loss += noise_bin_snr_loss
         
         if self.stoi_weight > 0:
@@ -99,7 +99,7 @@ class BinauralLoss(Module):
             voice_stoi_loss = (stoi_l+stoi_r)/2
             voice_stoi_loss_mean = voice_stoi_loss.mean()
             voice_bin_stoi_loss = self.stoi_weight*voice_stoi_loss_mean
-            print('\n Voice STOI Loss = ', voice_bin_stoi_loss)
+            # print('\n Voice STOI Loss = ', voice_bin_stoi_loss)
             loss += voice_bin_stoi_loss
 
             stoi_l = self.stoi_loss(noise[:, 0], noise_target[:, 0])
@@ -108,7 +108,7 @@ class BinauralLoss(Module):
             noise_stoi_loss = (stoi_l+stoi_r)/2
             noise_stoi_loss_mean = noise_stoi_loss.mean()
             noise_bin_stoi_loss = self.stoi_weight*noise_stoi_loss_mean
-            print('\n Noise STOI Loss = ', noise_bin_stoi_loss)
+            # print('\n Noise STOI Loss = ', noise_bin_stoi_loss)
             loss += noise_bin_stoi_loss
 
         if self.ild_weight > 0:
@@ -116,14 +116,14 @@ class BinauralLoss(Module):
                                    vlc.abs(), vrc.abs()).mean()
             
             voice_bin_ild_loss = self.ild_weight*voice_ild_loss
-            print('\n Voice ILD Loss = ', voice_bin_ild_loss)
+            # print('\n Voice ILD Loss = ', voice_bin_ild_loss)
             loss += voice_bin_ild_loss
 
             noise_ild_loss = ild_loss_db(noise_target_stft_l.abs(), noise_target_stft_r.abs(),
                                    nlc.abs(), nrc.abs()).mean()
             
             noise_bin_ild_loss = self.ild_weight*noise_ild_loss
-            print('\n Noise ILD Loss = ', noise_bin_ild_loss)
+            # print('\n Noise ILD Loss = ', noise_bin_ild_loss)
             loss += noise_bin_ild_loss
 
         if self.ipd_weight > 0:
@@ -131,14 +131,14 @@ class BinauralLoss(Module):
                                      vlc, vrc).mean()
             voice_bin_ipd_loss = self.ipd_weight*voice_ipd_loss
             
-            print('\n Voice IPD Loss = ', voice_bin_ipd_loss)
+            # print('\n Voice IPD Loss = ', voice_bin_ipd_loss)
             loss += voice_bin_ipd_loss
         
             noise_ipd_loss = ipd_loss_rads(noise_target_stft_l, noise_target_stft_r,
                                      nlc, nrc).mean()
             noise_bin_ipd_loss = self.ipd_weight*noise_ipd_loss
             
-            print('\n Noise IPD Loss = ', noise_bin_ipd_loss)
+            # print('\n Noise IPD Loss = ', noise_bin_ipd_loss)
             loss += noise_bin_ipd_loss
         
         target_stft_l = self.stft(voice_target[:, 0])
@@ -148,8 +148,19 @@ class BinauralLoss(Module):
         ild_loss = ild_loss_db(target_stft_l.abs(), target_stft_r.abs(), stft_l.abs(), stft_r.abs())
         ipd_loss = ipd_loss_rads(target_stft_l, target_stft_r, stft_l, stft_r)
 
-        return loss, (voice_snr_loss_lr, noise_snr_loss_lr, voice_stoi_loss_mean, noise_stoi_loss_mean, voice_ild_loss, noise_ild_loss, voice_ipd_loss, noise_ipd_loss, ild_loss, ipd_loss)
-        
+        # return loss, (voice_snr_loss_lr, noise_snr_loss_lr, voice_stoi_loss_mean, noise_stoi_loss_mean, voice_ild_loss, noise_ild_loss, voice_ipd_loss, noise_ipd_loss, ild_loss, ipd_loss)
+        metrics = {
+            "voice_snr":  voice_snr_loss_lr,
+            "noise_snr":  noise_snr_loss_lr,
+            "voice_stoi": voice_stoi_loss_mean,
+            "noise_stoi": noise_stoi_loss_mean,
+            "voice_ild":  voice_ild_loss,
+            "noise_ild":  noise_ild_loss,
+            "voice_ipd":  voice_ipd_loss,
+            "noise_ipd":  noise_ipd_loss,
+        }
+
+        return loss, metrics
  
 
 
