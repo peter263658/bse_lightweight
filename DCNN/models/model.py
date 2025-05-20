@@ -59,7 +59,7 @@ class Model(nn.Module):
             window = torch.hann_window(self.win_length, device=x.device)
             y = torch.stft(x, self.n_dft, hop_length=self.hop_size,
                         win_length=self.win_length, onesided=self.onesided,
-                        return_complex=True, window=window, normalized=True)
+                        return_complex=True, window=window, normalized=False)
             # y.shape == (batch_size*channels, time, freqs)
             if not self.is_complex:
                 y = torch.view_as_real(y)
@@ -72,7 +72,7 @@ class Model(nn.Module):
             window = torch.hann_window(self.win_length, device=x.device)
             y = torch.istft(x, self.n_dft, hop_length=self.hop_size,
                             win_length=self.win_length, onesided=self.onesided,
-                            window=window,normalized=True)
+                            window=window,normalized=False)
             return y
 
 
@@ -81,24 +81,36 @@ class Encoder(nn.Module):
     def __init__(self, band_num = 40, kernel_size = 5):
         super().__init__()
         self.band_num = band_num
-        self.conv_1_1 = self.Conv1dBlock(in_channels = band_num, out_channels = band_num, kernel_size = kernel_size, dilation = 1)
-        self.conv_1_2 = self.Conv1dBlock(in_channels= 129 - band_num, out_channels = band_num, kernel_size = kernel_size, dilation = 1)
-        self.conv_2 = self.Conv1dBlock(in_channels = band_num, out_channels = band_num, kernel_size = kernel_size, dilation = 2)
-        self.conv_3 = self.Conv1dBlock(in_channels = band_num, out_channels = band_num, kernel_size = kernel_size, dilation = 4)
-        
+        # self.conv_1_1 = self.Conv1dBlock(in_channels = band_num, out_channels = band_num, kernel_size = kernel_size, dilation = 1)
+        # self.conv_1_2 = self.Conv1dBlock(in_channels= 129 - band_num, out_channels = band_num, kernel_size = kernel_size, dilation = 1)
+        # self.conv_2 = self.Conv1dBlock(in_channels = band_num, out_channels = band_num, kernel_size = kernel_size, dilation = 2)
+        # self.conv_3 = self.Conv1dBlock(in_channels = band_num, out_channels = band_num, kernel_size = kernel_size, dilation = 4)
+        self.blocks = nn.Sequential(
+            LightConv1D(band_num, band_num, 5, dil=1),   # 1
+            LightConv1D(band_num, band_num, 5, dil=1),   # 2  (對應「非選取頻段」的融合，可用同一層)
+            LightConv1D(band_num, band_num, 5, dil=2),   # 3
+            LightConv1D(band_num, band_num, 5, dil=4)    # 4
+        )
     def forward(self, xlc, xrc, xln, xrn):
         xl_1 = xlc
         xl_2 = xln
         xr_1 = xrc
         xr_2 = xrn
-        convx_1 = self.conv_1_1(xl_1)
-        convx_2 = self.conv_1_2(xl_2)
-        xl = convx_1 + convx_2
-        xl = self.conv_3(self.conv_2(xl))
-        convx_1 = self.conv_1_1(xr_1)
-        convx_2 = self.conv_1_2(xr_2)
-        xr = convx_1 + convx_2
-        xr = self.conv_3(self.conv_2(xr))
+        # convx_1 = self.conv_1_1(xl_1)
+        # convx_2 = self.conv_1_2(xl_2)
+        # xl = convx_1 + convx_2
+        # xl = self.conv_3(self.conv_2(xl))
+        xl = xl_1
+        for blk in self.blocks:
+            xl = blk(xl)
+        # 同理 xr
+        # convx_1 = self.conv_1_1(xr_1)
+        # convx_2 = self.conv_1_2(xr_2)
+        # xr = convx_1 + convx_2
+        # xr = self.conv_3(self.conv_2(xr))
+        xr = xr_1
+        for blk in self.blocks:
+            xr = blk(xr)
         x = torch.stack((xl,xr),dim=1)
         return x
 
@@ -164,11 +176,12 @@ class Encoder(nn.Module):
 class RNN(nn.Module):
     def __init__(self, kernel_size=9, num_layers=3):
         super().__init__()
-        self.conv = self.Conv2dBlock(2, 16, kernel_size, dilation = 1)
+        # self.conv = self.Conv2dBlock(2, 16, kernel_size, dilation = 1)
+        self.dp = LightConv2D(40, 16, k=9, dil=1)
         # self.rnn = self.ComplexConvGRU(input_channels=16, hidden_channels=16, kernel_size=kernel_size, num_layers=num_layers)
 
     def forward(self, inputs):
-        x = self.conv(inputs.permute(0,1,3,2))
+        x = self.dp(inputs.permute(0,1,3,2))
         # x = self.rnn(x.permute(0, 2, 1, 3)).permute(0, 2, 1, 3)
         return x
     
@@ -371,6 +384,17 @@ class Decoder(nn.Module):
             def forward(self, x):
                 return x[:, :, :-self.chomp_size,:].contiguous()
  
+class LightConv1D(Model.Encoder.Conv1dBlock):
+    pass            # 直接用原作者的實作即可
+
+# 2-D depthwise + PW conv（拿掉 InstanceNorm）
+class LightConv2D(Model.RNN.Conv2dBlock):
+    def __init__(self, in_ch, out_ch, k=9, dil=1):
+        super().__init__(in_ch, out_ch, k, dilation=dil)
+        # self.net = [dw, chomp, pw, norm, prelu]
+        # 把 norm 移除
+        dw, ch, pw, _, act = self.net
+        self.net = nn.Sequential(dw, ch, pw, act)
 
 if __name__ == '__main__':
     model = Model()

@@ -1,7 +1,7 @@
 training:
   # --- Training schedule ---
   batch_size:          16      # LBCCN paper 建議輕量 batch :contentReference[oaicite:24]{index=24}:contentReference[oaicite:25]{index=25}
-  n_epochs:            100      # 20–50 epochs :contentReference[oaicite:26]{index=26}:contentReference[oaicite:27]{index=27}
+  n_epochs:            300      # 20–50 epochs :contentReference[oaicite:26]{index=26}:contentReference[oaicite:27]{index=27}
   learning_rate:       0.0001  # Adam 初始 LR :contentReference[oaicite:28]{index=28}:contentReference[oaicite:29]{index=29}
 
   # --- DataLoader & Accelerator ---

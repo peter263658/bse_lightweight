@@ -27,9 +27,9 @@ training:
   batch_size: 32
   # learning_rate: 0.001  # Initial learning rate as per paper
   learning_rate: 0.0001  # Initial learning rate as per paper
-  learning_rate_decay_steps: [3, 8]
-  learning_rate_decay_values: 0.5
-  n_epochs: 100         # Number of epochs as per paper
+  # learning_rate_decay_steps: [3, 8]
+  # learning_rate_decay_values: 0.5
+  n_epochs: 300         # Number of epochs as per paper
   n_workers: 4
   pin_memory: true
   strategy: auto

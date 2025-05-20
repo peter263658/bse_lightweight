@@ -525,11 +525,16 @@ def process_timit_dataset(clean_files, noise_files, hrirs_dict, output_dirs,
                 if len(speech) < target_len:
                     speech = np.pad(speech, (0, target_len - len(speech)))
             
-            # Choose ONE random azimuth to use across all SNR levels
-            available_azimuths = [az for az in hrirs_dict.keys() if -60 <= az <= 60]
-            if not available_azimuths:
-                available_azimuths = list(hrirs_dict.keys())
-            azimuth = random.choice(available_azimuths)
+            # # Choose ONE random azimuth to use across all SNR levels
+            # available_azimuths = [az for az in hrirs_dict.keys() if -60 <= az <= 60]
+            # if not available_azimuths:
+            #     available_azimuths = list(hrirs_dict.keys())
+            # azimuth = random.choice(available_azimuths)
+
+            # LBCCN: 乾淨語音一律用 +45°（右側）HRIR
+            azimuth = 55
+            if azimuth not in hrirs_dict:
+                raise RuntimeError(f"HRIR +45° not found, got keys: {list(hrirs_dict)[:5]} ...")
             
             # Extract IDs
             speaker_id = file_path.parent.name
@@ -678,8 +683,8 @@ def process_vctk_train_val_sets(train_files, val_files, noise_files, hrirs_dict,
     print(f"Processing VCTK train and validation sets...")
     
     # SNR range for training/validation (-7 to 16 dB as per paper)
-    min_snr = -7
-    max_snr = 16
+    min_snr = -10
+    max_snr = 10
     
     # Process training files
     process_files_with_random_snr(train_files, noise_files, hrirs_dict, 

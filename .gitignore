@@ -49,3 +49,5 @@ Dataset/
 EOF
 
 outputs/*
+results_May04/*
+*.log
