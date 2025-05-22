@@ -174,6 +174,21 @@ def load_hrir(hrir_path, format='wav', target_sr=16000):
         assert hrir.shape[0] == 2, f"Expected HRIR shape [2, N], got {hrir.shape}"
 
     print(f"Loaded and validated {len(valid_hrirs_dict)} HRIR azimuth positions")
+
+    if 55 in valid_hrirs_dict:
+        print(f"✓ Found HRIR for azimuth 55° required by LBCCN paper")
+        # 特別顯示55度HRIR的ILD
+        hrir55 = valid_hrirs_dict[55]
+        l_energy = np.sum(hrir55[0]**2)
+        r_energy = np.sum(hrir55[1]**2)
+        ild_db = 10 * np.log10((l_energy + 1e-10) / (r_energy + 1e-10))
+        print(f"  Azimuth 55° ILD: {ild_db:.2f} dB (expected < 0 for positive azimuth)")
+    else:
+        print(f"⚠ Warning: No HRIR found for azimuth 55° required by LBCCN paper")
+        available = sorted(list(valid_hrirs_dict.keys()))
+        closest = min(available, key=lambda x: abs(x - 55))
+        print(f"  Closest available azimuth: {closest}°")
+    
     return valid_hrirs_dict  # Return the validated dictionary
 
 
@@ -340,43 +355,63 @@ def mix_speech_and_noise(speech, noise, target_snr):
         # Return clean speech as fallback
         return speech
 
-def find_wav_files(directory, recursive=True):
+
+def find_wav_files(directory, recursive=True, use_flac=False):
     """
-    Find all WAV files in a directory with proper handling for TIMIT structure
-    
-    Args:
-        directory: Root directory to search
-        recursive: Whether to search recursively in subdirectories
-    
-    Returns:
-        List of Path objects for WAV files
+    Find all WAV/FLAC files in a directory, 優化版能處理DEMAND結構
     """
     wav_files = []
     
-    # Check if this might be TIMIT structure
-    is_timit_structure = False
-    test_dir = os.path.join(directory, 'test')
-    train_dir = os.path.join(directory, 'train')
+    # 檢查是否為DEMAND結構(直接檢查子目錄)
+    demand_folders = ['DKITCHEN', 'DLIVING', 'DWASHING', 'NFIELD', 'NPARK', 'NRIVER', 
+                     'OHALLWAY', 'OMEETING', 'OOFFICE', 'PCAFETER', 'PRESTO', 
+                     'PSTATION', 'SCAFE', 'SPSQUARE', 'STRAFFIC', 'TBUS', 'TCAR', 'TMETRO']
     
-    if os.path.isdir(test_dir) and os.path.isdir(train_dir):
-        is_timit_structure = True
+    # 先檢查是否有這些子目錄存在
+    demand_dirs = [d for d in demand_folders if os.path.isdir(os.path.join(directory, d))]
+    
+    if demand_dirs:
+        print(f"Detected DEMAND structure with {len(demand_dirs)} environments")
+        # 搜索所有環境目錄中的WAV文件
+        for env in demand_dirs:
+            env_dir = os.path.join(directory, env)
+            env_files = [Path(os.path.join(env_dir, f)) for f in os.listdir(env_dir) 
+                        if f.lower().endswith('.wav')]
+            print(f"  - Found {len(env_files)} files in {env}")
+            wav_files.extend(env_files)
+    
+    # 檢查是否為TIMIT結構
+    elif os.path.isdir(os.path.join(directory, 'test')) and os.path.isdir(os.path.join(directory, 'train')):
         print("Detected TIMIT directory structure")
-        
-        # Recursively find all WAV files in test and train directories
-        for subdir in ['test', 'train']:
-            for root, dirs, files in os.walk(os.path.join(directory, subdir)):
-                for file in files:
-                    if file.lower().endswith('.wav'):
-                        wav_files.append(Path(os.path.join(root, file)))
-    else:
-        # Regular directory search
-        if recursive:
-            wav_files = list(Path(directory).rglob('*.wav'))
-        else:
-            wav_files = list(Path(directory).glob('*.wav'))
+        for sub in ('test','train'):
+            for root, _, files in os.walk(os.path.join(directory, sub)):
+                for fn in files:
+                    if fn.lower().endswith('.wav') or (use_flac and fn.lower().endswith('.flac')):
+                        wav_files.append(Path(root) / fn)
     
-    print(f"Found {len(wav_files)} WAV files in {directory}")
+    # 檢查是否為LibriSpeech結構
+    elif os.path.isdir(os.path.join(directory, 'dev-clean')) or \
+         os.path.isdir(os.path.join(directory, 'train-clean-360')):
+        print("Detected Librispeech directory structure")
+        for root, _, files in os.walk(directory):
+            for fn in files:
+                if fn.lower().endswith('.flac'):
+                    wav_files.append(Path(root) / fn)
+    
+    # 一般目錄結構(遞歸或非遞歸)
+    else:
+        if recursive:
+            pattern = '*.flac' if use_flac else '*.wav'
+            wav_files = list(Path(directory).rglob(pattern))
+        else:
+            pattern = '*.flac' if use_flac else '*.wav'
+            wav_files = list(Path(directory).glob(pattern))
+    
+    ftype = "FLAC" if use_flac else "WAV"
+    print(f"Found {len(wav_files)} {ftype} files in {directory}")
+    
     return wav_files
+
 
 def prepare_dataset(clean_dir, noise_dir, hrir_path, output_base_dir, format='wav',
                    split_ratio=[0.7, 0.15, 0.15], dataset_type='vctk', 
@@ -385,68 +420,46 @@ def prepare_dataset(clean_dir, noise_dir, hrir_path, output_base_dir, format='wa
     Prepare binaural speech dataset with noise for BCCTN model
     
     Args:
-        clean_dir: Directory containing clean speech files (VCTK/TIMIT)
-        noise_dir: Directory containing noise files (NOISEX92)
+        clean_dir: Directory containing clean speech files (Librispeech)
+        noise_dir: Directory containing noise files (DEMAND)
         hrir_path: Path to HRIR files
         output_base_dir: Base directory for output
         format: Format of HRIR files ('wav' or 'mat')
-        split_ratio: Train/validation/test split ratio
-        dataset_type: 'vctk' for training or 'timit' for unmatched testing
-        use_snr_subdirs: Whether to use SNR-specific subdirectories for TIMIT
+        split_ratio: Train/validation/test split ratio (only used for VCTK)
+        dataset_type: 'vctk' or 'librispeech' or 'timit'
+        use_snr_subdirs: Whether to use SNR-specific subdirectories for test set
     """
     # Target sampling rate as specified in the paper
     target_sr = 16000
     
-    # Define SNR levels as used in the paper for both VCTK and TIMIT
-    snr_levels = [-6, -3, 0, 3, 6, 9, 12, 15]
+    # Define SNR levels as used in the paper for test sets
+    snr_levels = [-10, -5, 0, 5, 10]
     
     # Load HRIRs
     print("Loading HRIRs...")
     hrirs_dict = load_hrir(hrir_path, format, target_sr=target_sr)
     
     # Create output directories
-    if dataset_type == 'vctk':
-        output_dirs = {
-            'clean_train': os.path.join(output_base_dir, 'clean_trainset'),
-            'clean_val': os.path.join(output_base_dir, 'clean_valset'),
-            'clean_test': os.path.join(output_base_dir, 'clean_testset'),
-            'noisy_train': os.path.join(output_base_dir, 'noisy_trainset'),
-            'noisy_val': os.path.join(output_base_dir, 'noisy_valset'),
-            'noisy_test': os.path.join(output_base_dir, 'noisy_testset')
-        }
-        
-        for dir_path in output_dirs.values():
-            os.makedirs(dir_path, exist_ok=True)
-            
-        # Create SNR subdirectories for VCTK test set for easier evaluation
-        if use_snr_subdirs:
-            for snr in snr_levels:
-                snr_dir = os.path.join(output_dirs['noisy_test'], f'snr_{snr}dB')
-                os.makedirs(snr_dir, exist_ok=True)
-    else:  # timit - create test dirs with SNR subdirectories
-        output_dirs = {
-            'clean_test': os.path.join(output_base_dir, 'clean_testset_timit'),
-            'noisy_test': os.path.join(output_base_dir, 'noisy_testset_timit')
-        }
-        
-        # Create main directories
-        for dir_path in output_dirs.values():
-            os.makedirs(dir_path, exist_ok=True)
-            
-        # For TIMIT test, create SNR-specific directories if needed
-        if use_snr_subdirs:
-            for snr in snr_levels:
-                snr_dir = os.path.join(output_dirs['noisy_test'], f'snr_{snr}dB')
-                os.makedirs(snr_dir, exist_ok=True)
+    output_dirs = {
+        'clean_train': os.path.join(output_base_dir, 'clean_trainset'),
+        'clean_val': os.path.join(output_base_dir, 'clean_valset'),
+        'clean_test': os.path.join(output_base_dir, 'clean_testset'),
+        'noisy_train': os.path.join(output_base_dir, 'noisy_trainset'),
+        'noisy_val': os.path.join(output_base_dir, 'noisy_valset'),
+        'noisy_test': os.path.join(output_base_dir, 'noisy_testset')
+    }
     
-    # Get all clean speech files with special handling for TIMIT
-    clean_files = find_wav_files(clean_dir)
+    # Create directories
+    for dir_path in output_dirs.values():
+        os.makedirs(dir_path, exist_ok=True)
     
-    if len(clean_files) == 0:
-        print(f"Error: No WAV files found in {clean_dir}. Cannot continue.")
-        return
+    # Create SNR subdirectories for test set if needed
+    if use_snr_subdirs:
+        for snr in snr_levels:
+            snr_dir = os.path.join(output_dirs['noisy_test'], f'snr_{snr}dB')
+            os.makedirs(snr_dir, exist_ok=True)
     
-    # Get all noise files (for both VCTK and TIMIT)
+    # Get all noise files
     noise_files = find_wav_files(noise_dir)
     
     # Create a white noise file if no noise files are found
@@ -459,129 +472,65 @@ def prepare_dataset(clean_dir, noise_dir, hrir_path, output_base_dir, format='wa
     
     # Process TIMIT separately
     if dataset_type == 'timit':
+        clean_files = find_wav_files(clean_dir)
+        if len(clean_files) == 0:
+            print(f"Error: No files found in {clean_dir}. Cannot continue.")
+            return
         process_timit_dataset(clean_files, noise_files, hrirs_dict, output_dirs, 
-                              snr_levels, target_sr, use_snr_subdirs)
+                             snr_levels, target_sr, use_snr_subdirs)
         return
     
-    # VCTK processing starts here
-    random.shuffle(clean_files)
+    # Process LibriSpeech with pre-defined splits
+    elif dataset_type == 'librispeech':
+        all_files = find_wav_files(clean_dir, use_flac=True)
+        
+        if len(all_files) == 0:
+            print(f"Error: No LibriSpeech files found in {clean_dir}. Cannot continue.")
+            return
+        
+        # Split files according to LibriSpeech directories
+        train_files = [p for p in all_files if "train-clean-360" in str(p)]
+        val_files = [p for p in all_files if "dev-clean" in str(p)]
+        test_files = [p for p in all_files if "test-clean" in str(p)]
+        
+        print(f"LibriSpeech split: train={len(train_files)}, val={len(val_files)}, test={len(test_files)}")
+        
+        # Process test set with fixed SNR levels (like TIMIT)
+        process_vctk_test_set(test_files, noise_files, hrirs_dict, output_dirs,
+                             snr_levels, target_sr, use_snr_subdirs)
+        
+        # Process train and val sets with random SNRs in ranges
+        process_vctk_train_val_sets(train_files, val_files, noise_files, hrirs_dict, 
+                                   output_dirs, target_sr)
+        return
     
-    # Split into train/val/test
-    n_files = len(clean_files)
-    n_train = int(n_files * split_ratio[0])
-    n_val = int(n_files * split_ratio[1])
-    
-    train_files = clean_files[:n_train]
-    val_files = clean_files[n_train:n_train+n_val]
-    test_files = clean_files[n_train+n_val:]
-    
-    # Process VCTK test set with fixed SNR levels (like TIMIT)
-    process_vctk_test_set(test_files, noise_files, hrirs_dict, output_dirs,
-                         snr_levels, target_sr, use_snr_subdirs)
-    
-    # Process train and val sets with random SNRs in ranges
-    process_vctk_train_val_sets(train_files, val_files, noise_files, hrirs_dict, 
-                                output_dirs, target_sr)
-
-def process_timit_dataset(clean_files, noise_files, hrirs_dict, output_dirs, 
-                         snr_levels, target_sr, use_snr_subdirs):
-    """Process TIMIT dataset with consistent azimuths across SNR levels"""
-    
-    print(f"Processing TIMIT dataset with consistent azimuths across SNR levels...")
-    
-    for i, file_path in enumerate(tqdm.tqdm(clean_files)):
-        try:
-            # Load and process speech
-            speech, file_sr = librosa.load(str(file_path), sr=None, mono=True)
-            
-            # Skip files that are too short (less than 0.5 seconds)
-            if len(speech) / file_sr < 0.5:
-                print(f"Skipping {file_path}: too short ({len(speech) / file_sr:.2f} seconds)")
-                continue
-                
-            # Resample if necessary
-            if file_sr != target_sr:
-                speech = librosa.resample(speech, orig_sr=file_sr, target_sr=target_sr)
-            
-            # Ensure 2 seconds duration
-            target_len = 2 * target_sr
-            
-            # Handle short audio properly
-            if len(speech) < target_len:
-                speech = np.pad(speech, (0, target_len - len(speech)))
-            else:
-                try:
-                    start = np.random.randint(0, max(1, len(speech) - target_len))
-                    speech = speech[start:start + target_len]
-                except Exception as e:
-                    print(f"Error trimming audio: {e}. Padding instead.")
-                    speech = speech[:target_len]
-                    if len(speech) < target_len:
-                        speech = np.pad(speech, (0, target_len - len(speech)))
-            
-            # Ensure exact target length
-            if len(speech) != target_len:
-                speech = speech[:target_len]
-                if len(speech) < target_len:
-                    speech = np.pad(speech, (0, target_len - len(speech)))
-            
-            # # Choose ONE random azimuth to use across all SNR levels
-            # available_azimuths = [az for az in hrirs_dict.keys() if -60 <= az <= 60]
-            # if not available_azimuths:
-            #     available_azimuths = list(hrirs_dict.keys())
-            # azimuth = random.choice(available_azimuths)
-
-            # LBCCN: 乾淨語音一律用 +45°（右側）HRIR
-            azimuth = 55
-            if azimuth not in hrirs_dict:
-                raise RuntimeError(f"HRIR +45° not found, got keys: {list(hrirs_dict)[:5]} ...")
-            
-            # Extract IDs
-            speaker_id = file_path.parent.name
-            sentence_id = file_path.stem
-            base_id = f"{speaker_id}_{sentence_id}"
-            
-            # Create binaural clean speech just once
-            hrir = hrirs_dict[azimuth]
-            binaural_speech = apply_hrir_fixed(speech, hrir[0], hrir[1], 
-                                        target_sr=target_sr, target_length=target_len)
-            
-            # Save clean speech once
-            clean_filename = f"{base_id}_az{azimuth}.wav"
-            clean_output_path = os.path.join(output_dirs['clean_test'], clean_filename)
-            sf.write(clean_output_path, binaural_speech.T, target_sr)
-            
-            # For each SNR level, create a corresponding noisy version
-            for snr in snr_levels:
-                # Choose noise
-                noise_file = random.choice(noise_files)
-                
-                # Create noise
-                binaural_noise = create_isotropic_noise(
-                    str(noise_file), hrirs_dict, duration=2, sr=target_sr)
-                
-                # Mix at this specific SNR
-                noisy_speech = mix_speech_and_noise(binaural_speech, binaural_noise, snr)
-                
-                # Save to appropriate directory
-                # noisy_filename = f"{base_id}_az{azimuth}_snr{snr}.wav"
-                # Always use this format:
-                noisy_filename = f"{base_id}_az{azimuth}_snr{snr:+.1f}.wav"
-                if use_snr_subdirs:
-                    # Use SNR subdirectories
-                    snr_dir = os.path.join(output_dirs['noisy_test'], f'snr_{snr}dB')
-                    noisy_output_path = os.path.join(snr_dir, noisy_filename)
-                else:
-                    # Use flat structure
-                    noisy_output_path = os.path.join(output_dirs['noisy_test'], noisy_filename)
-                
-                sf.write(noisy_output_path, noisy_speech.T, target_sr)
-            
-        except Exception as e:
-            print(f"Error processing {file_path}: {e}")
-            continue
-    
-    print("TIMIT dataset processing complete!")
+    # Process VCTK with random split
+    else:  # dataset_type == 'vctk'
+        clean_files = find_wav_files(clean_dir)
+        
+        if len(clean_files) == 0:
+            print(f"Error: No WAV files found in {clean_dir}. Cannot continue.")
+            return
+        
+        # Random shuffle for VCTK
+        random.shuffle(clean_files)
+        
+        # Split into train/val/test
+        n_files = len(clean_files)
+        n_train = int(n_files * split_ratio[0])
+        n_val = int(n_files * split_ratio[1])
+        
+        train_files = clean_files[:n_train]
+        val_files = clean_files[n_train:n_train+n_val]
+        test_files = clean_files[n_train+n_val:]
+        
+        # Process VCTK test set with fixed SNR levels
+        process_vctk_test_set(test_files, noise_files, hrirs_dict, output_dirs,
+                             snr_levels, target_sr, use_snr_subdirs)
+        
+        # Process train and val sets with random SNRs
+        process_vctk_train_val_sets(train_files, val_files, noise_files, hrirs_dict, 
+                                   output_dirs, target_sr)
 
 def process_vctk_test_set(test_files, noise_files, hrirs_dict, output_dirs,
                          snr_levels, target_sr, use_snr_subdirs):
@@ -592,7 +541,11 @@ def process_vctk_test_set(test_files, noise_files, hrirs_dict, output_dirs,
     for i, file_path in enumerate(tqdm.tqdm(test_files)):
         try:
             # Load mono clean speech
-            speech, file_sr = librosa.load(str(file_path), sr=None, mono=True)
+            # Handle both WAV and FLAC files
+            if str(file_path).lower().endswith('.flac'):
+                speech, file_sr = librosa.load(str(file_path), sr=None, mono=True)
+            else:
+                speech, file_sr = librosa.load(str(file_path), sr=None, mono=True)
             
             # Skip files that are too short
             if len(speech) / file_sr < 0.5:
@@ -626,10 +579,11 @@ def process_vctk_test_set(test_files, noise_files, hrirs_dict, output_dirs,
                     speech = np.pad(speech, (0, target_len - len(speech)))
             
             # Choose ONE random azimuth to use across all SNR levels
-            available_azimuths = [az for az in hrirs_dict.keys() if -60 <= az <= 60]
-            if not available_azimuths:
-                available_azimuths = list(hrirs_dict.keys())
-            azimuth = random.choice(available_azimuths)
+            # available_azimuths = [az for az in hrirs_dict.keys() if -60 <= az <= 60]
+            # if not available_azimuths:
+            #     available_azimuths = list(hrirs_dict.keys())
+            # azimuth = random.choice(available_azimuths)
+            azimuth = 55
             
             # Extract IDs
             speaker_id = file_path.parent.name
@@ -739,10 +693,11 @@ def process_files_with_random_snr(files, noise_files, hrirs_dict, clean_output_d
                     speech = np.pad(speech, (0, target_len - len(speech)))
             
             # Choose random azimuth
-            available_azimuths = [az for az in hrirs_dict.keys() if -60 <= az <= 60]
-            if not available_azimuths:
-                available_azimuths = list(hrirs_dict.keys())
-            azimuth = random.choice(available_azimuths)
+            # available_azimuths = [az for az in hrirs_dict.keys() if -60 <= az <= 60]
+            # if not available_azimuths:
+            #     available_azimuths = list(hrirs_dict.keys())
+            # azimuth = random.choice(available_azimuths)
+            azimuth = 55
             
             # Extract IDs
             speaker_id = file_path.parent.name
@@ -783,8 +738,8 @@ def process_files_with_random_snr(files, noise_files, hrirs_dict, clean_output_d
 
 def main():
     parser = argparse.ArgumentParser(description="Prepare binaural speech dataset for BCCTN")
-    parser.add_argument("--clean_dir", required=True, help="Directory containing clean speech files")
-    parser.add_argument("--noise_dir", required=True, help="Directory containing noise files")
+    parser.add_argument("--clean_dir", required=True, help="Directory containing clean speech files (Librispeech)")
+    parser.add_argument("--noise_dir", required=True, help="Directory containing noise files (DEMAND)")
     parser.add_argument("--hrir_path", required=True, help="Path to HRIR files or directory")
     parser.add_argument("--output_dir", required=True, help="Base directory for output")
     parser.add_argument("--hrir_format", default="wav", choices=["wav", "mat"], help="Format of HRIR files")

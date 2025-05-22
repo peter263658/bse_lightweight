@@ -501,20 +501,15 @@ def safe_evaluate_file(clean_path, noisy_path, model, device):
         # Process through model - create batch tensor [1, 2, samples]
         noisy_tensor = torch.tensor(noisy_data.T, dtype=torch.float32).unsqueeze(0).to(device)
         
-        # # Run through model
-        # with torch.no_grad():
-        #     enhanced_tensor = model(noisy_tensor)
-        #     enhanced_data = enhanced_tensor.cpu().numpy()[0]  # [2, samples]
-
+        # Run through model
         with torch.no_grad():
-            out = model(noisy_tensor)
-            # 如果模型返回 tuple，则第 0/1 元素分别是 (voice, noise)
+            out = model(noisy_tensor)        # 可能回傳 tuple
             if isinstance(out, tuple):
-                # 这里我们只取 voice, 即增强后的双通道语音
-                enhanced_tensor = out[0]
+                # 依你 model.forward 的定義，voice (乾淨雙聲道) 放在第一個
+                enhanced_tensor = out[0]     # shape: [B, 2, samples]
             else:
                 enhanced_tensor = out
-            enhanced_data = enhanced_tensor.cpu().numpy()[0]  # [2, samples]
+            enhanced_data = enhanced_tensor.cpu().numpy()[0]   # [2, samples]
             
         # Ensure enhanced data matches the original clean length
         orig_len = clean_data.shape[0]
@@ -887,7 +882,8 @@ def evaluate_at_paper_snrs(model_checkpoint, vctk_test_dir, vctk_clean_dir,
         Dictionary of results by SNR
     """
     # SNR levels used in the paper
-    paper_snrs = [-6, -3, 0, 3, 6, 9, 12, 15]
+    # paper_snrs = [-6, -3, 0, 3, 6, 9, 12, 15]
+    paper_snrs = [-10, -5, 0, 5, 10]
     
     # Process VCTK dataset
     vctk_results_by_snr = {}

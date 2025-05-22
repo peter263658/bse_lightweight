@@ -16,6 +16,7 @@ class Model(nn.Module):
         self.rnn = RNN(kernel_size = 9, num_layers = 3)
         self.A_decoder = Decoder(kernel_size = 9)
         self.B_decoder = Decoder(kernel_size = 9)
+        self.eps = 1e-8
     
     def forward(self, inputs):
         xl = self.stft(inputs[:,0])
@@ -27,11 +28,20 @@ class Model(nn.Module):
 
         x = self.encoder(xlc, xrc, xln, xrn)
         x = self.rnn(x)
-        a = self.A_decoder(x)
-        b = self.B_decoder(x)
+        # a = self.A_decoder(x)
+        # b = self.B_decoder(x)
 
-        vrc = (xlc - b*xrc) / (a - b)
-        vlc = a*vrc
+        a = self.A_decoder(x)        # (B, T, 2)
+        a = a.mean(dim=-1, keepdim=True)             # (B, T, 1)
+        a = a.transpose(1,2).expand(-1, self.band_num, -1)  # (B, 40, T)
+
+        b = self.B_decoder(x)
+        b = b.mean(dim=-1, keepdim=True)
+        b = b.transpose(1,2).expand(-1, self.band_num, -1)
+
+
+        vrc = (xlc - b * xrc) / (a - b + self.eps)
+        vlc = a * vrc
         nlc = xlc - vlc
         nrc = xrc - vrc
 
@@ -85,11 +95,14 @@ class Encoder(nn.Module):
         # self.conv_1_2 = self.Conv1dBlock(in_channels= 129 - band_num, out_channels = band_num, kernel_size = kernel_size, dilation = 1)
         # self.conv_2 = self.Conv1dBlock(in_channels = band_num, out_channels = band_num, kernel_size = kernel_size, dilation = 2)
         # self.conv_3 = self.Conv1dBlock(in_channels = band_num, out_channels = band_num, kernel_size = kernel_size, dilation = 4)
-        self.blocks = nn.Sequential(
-            LightConv1D(band_num, band_num, 5, dil=1),   # 1
-            LightConv1D(band_num, band_num, 5, dil=1),   # 2  (對應「非選取頻段」的融合，可用同一層)
-            LightConv1D(band_num, band_num, 5, dil=2),   # 3
-            LightConv1D(band_num, band_num, 5, dil=4)    # 4
+        # ↓ 兩條平行 1-D conv – 論文 Fig.1
+        self.sel = LightConv1D(band_num,          band_num, 5, dil=1)        # 已選頻段
+        self.uns = LightConv1D(129 - band_num,    band_num, 5, dil=1)        # 未選頻段→壓縮
+
+        # M = 2 追加層（dil=1,2）
+        self.post = nn.Sequential(
+            LightConv1D(band_num, band_num, 5, dil=2),
+            LightConv1D(band_num, band_num, 5, dil=4)
         )
     def forward(self, xlc, xrc, xln, xrn):
         xl_1 = xlc
@@ -100,17 +113,16 @@ class Encoder(nn.Module):
         # convx_2 = self.conv_1_2(xl_2)
         # xl = convx_1 + convx_2
         # xl = self.conv_3(self.conv_2(xl))
-        xl = xl_1
-        for blk in self.blocks:
-            xl = blk(xl)
+        xl = self.sel(xlc) + self.uns(xln)
+        xl = self.post(xl)
         # 同理 xr
         # convx_1 = self.conv_1_1(xr_1)
         # convx_2 = self.conv_1_2(xr_2)
         # xr = convx_1 + convx_2
         # xr = self.conv_3(self.conv_2(xr))
-        xr = xr_1
-        for blk in self.blocks:
-            xr = blk(xr)
+        xr = self.sel(xrc) + self.uns(xrn)
+        xr = self.post(xr)
+
         x = torch.stack((xl,xr),dim=1)
         return x
 
@@ -121,10 +133,10 @@ class Encoder(nn.Module):
             # [M, H, K] -> [M, H, K]
             depthwise_conv = self.ComplexConv1d(in_channels, in_channels, kernel_size, 
                                         padding=dilation * (kernel_size - 1), 
-                                        dilation=dilation, groups=in_channels)
+                                        dilation=dilation, groups=in_channels, bias=False)
             # [M, H, K] -> [M, B, K]
             chomp = self.Chomp1d(dilation * (kernel_size - 1))
-            pointwise_conv = self.ComplexConv1d(in_channels, out_channels, kernel_size=1)
+            pointwise_conv = self.ComplexConv1d(in_channels, out_channels, kernel_size=1, bias=True)
             prelu = self.ComplexPReLU()
             norm = self.ComplexInstanceNorm1d(out_channels, affine=True)
             self.net = nn.Sequential(depthwise_conv, chomp, pointwise_conv, norm, prelu)
@@ -134,7 +146,7 @@ class Encoder(nn.Module):
         
         class ComplexConv1d(nn.Module):
             def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=0,
-                        dilation=1, groups=1, bias=True):
+                        dilation=1, groups=1, bias=False):
                 super().__init__()
                 self.conv_r = nn.Conv1d(in_channels, out_channels,
                                     kernel_size, stride, padding, dilation, groups, bias)
@@ -176,12 +188,12 @@ class Encoder(nn.Module):
 class RNN(nn.Module):
     def __init__(self, kernel_size=9, num_layers=3):
         super().__init__()
-        # self.conv = self.Conv2dBlock(2, 16, kernel_size, dilation = 1)
-        self.dp = LightConv2D(40, 16, k=9, dil=1)
+        self.dp = self.Conv2dBlock(40, 16, kernel_size, dilation = 1)
+        # self.dp = LightConv2D(40, 16, k=9, dil=1)
         # self.rnn = self.ComplexConvGRU(input_channels=16, hidden_channels=16, kernel_size=kernel_size, num_layers=num_layers)
 
     def forward(self, inputs):
-        x = self.dp(inputs.permute(0,1,3,2))
+        x = self.dp(inputs.permute(0,2,1,3))
         # x = self.rnn(x.permute(0, 2, 1, 3)).permute(0, 2, 1, 3)
         return x
     
@@ -192,7 +204,7 @@ class RNN(nn.Module):
                                         padding=self.get_padding_2d(kernel_size, dilation=(dilation, 1)),
                                         dilation=(dilation, 1), groups=in_channels)
             chomp = self.Chomp2d(dilation * (kernel_size - 1))
-            pointwise_conv = self.ComplexConv2d(in_channels, out_channels, kernel_size=(1, 1))
+            pointwise_conv = self.ComplexConv2d(in_channels, out_channels, kernel_size=1)
             prelu = self.ComplexPReLU()
             norm = self.ComplexInstanceNorm2d(out_channels, affine=True)
             self.net = nn.Sequential(depthwise_conv, chomp, pointwise_conv, norm, prelu)
@@ -319,13 +331,19 @@ class RNN(nn.Module):
 class Decoder(nn.Module):
     def __init__(self, kernel_size=9):
         super().__init__()
-        self.conv_1 = self.Conv2dBlock(16, 16, kernel_size, dilation = 1)
-        self.conv_2 = self.Conv2dBlock(16, 16, kernel_size, dilation = 2)
-        self.conv_3 = self.Conv2dBlock(16, 1, kernel_size, dilation = 4)
+        # self.conv_1 = self.Conv2dBlock(16, 16, kernel_size, dilation = 1)
+        # self.conv_2 = self.Conv2dBlock(16, 16, kernel_size, dilation = 2)
+        # self.conv_3 = self.Conv2dBlock(16, 1, kernel_size, dilation = 4)
+        self.conv_1 = LightConv2D(16, 16, kernel_size, dilation = 1)
+        self.conv_2 = LightConv2D(16, 16, kernel_size, dilation = 2)
+        self.conv_3 = LightConv2D(16, 1, kernel_size, dilation = 4)
 
     def forward(self, inputs):
-        x = self.conv_3(self.conv_2(self.conv_1(inputs))).squeeze(1).permute(0,2,1)
-        return x
+        # x = self.conv_3(self.conv_2(self.conv_1(inputs))).squeeze(1).permute(0,2,1)
+        # inputs: (B,16,2,T) → (B,1,2,T) → (B,T,2)
+        x = self.conv_3(self.conv_2(self.conv_1(inputs)))
+        return x.squeeze(1).permute(0,2,1)
+        # return x
 
     class Conv2dBlock(nn.Module):
         def __init__(self, in_channels, out_channels, kernel_size, dilation=1):
@@ -384,12 +402,16 @@ class Decoder(nn.Module):
             def forward(self, x):
                 return x[:, :, :-self.chomp_size,:].contiguous()
  
-class LightConv1D(Model.Encoder.Conv1dBlock):
-    pass            # 直接用原作者的實作即可
+class LightConv1D(Encoder.Conv1dBlock):
+    def __init__(self, in_ch, out_ch, k=5, dil=1):
+        super().__init__(in_ch, out_ch, k, dilation=dil)   # ← 把 dil 映射過去
 
 # 2-D depthwise + PW conv（拿掉 InstanceNorm）
-class LightConv2D(Model.RNN.Conv2dBlock):
-    def __init__(self, in_ch, out_ch, k=9, dil=1):
+class LightConv2D(RNN.Conv2dBlock):
+    def __init__(self, in_ch, out_ch, k=9, dilation=1, dil=None):
+        # 兼容兩個參數名；優先用 dil，如果沒給就用 dilation
+        if dil is None:
+            dil = dilation
         super().__init__(in_ch, out_ch, k, dilation=dil)
         # self.net = [dw, chomp, pw, norm, prelu]
         # 把 norm 移除
