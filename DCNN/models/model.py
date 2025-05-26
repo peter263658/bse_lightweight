@@ -188,8 +188,8 @@ class Encoder(nn.Module):
 class RNN(nn.Module):
     def __init__(self, kernel_size=9, num_layers=3):
         super().__init__()
-        self.dp = self.Conv2dBlock(40, 16, kernel_size, dilation = 1)
-        # self.dp = LightConv2D(40, 16, k=9, dil=1)
+        # self.dp = self.Conv2dBlock(40, 16, kernel_size, dilation = 1)
+        self.dp = LightConv2D(40, 16, k=9, dil=1)
         # self.rnn = self.ComplexConvGRU(input_channels=16, hidden_channels=16, kernel_size=kernel_size, num_layers=num_layers)
 
     def forward(self, inputs):
@@ -202,7 +202,7 @@ class RNN(nn.Module):
             super().__init__()
             depthwise_conv = self.ComplexConv2d(in_channels, in_channels, kernel_size,
                                         padding=self.get_padding_2d(kernel_size, dilation=(dilation, 1)),
-                                        dilation=(dilation, 1), groups=in_channels)
+                                        dilation=(dilation, 1), groups=in_channels, bias=False)
             chomp = self.Chomp2d(dilation * (kernel_size - 1))
             pointwise_conv = self.ComplexConv2d(in_channels, out_channels, kernel_size=1)
             prelu = self.ComplexPReLU()

@@ -8,7 +8,7 @@
 # MODEL_CHECKPOINT="/raid/R12K41024/LBCCN/outputs/2025-05-19/03-42-47/logs/lightning_logs/version_0/checkpoints/epoch=97-step=94864.ckpt" 
 # MODEL_CHECKPOINT="/raid/R12K41024/BCCTN/outputs/2025-05-12/15-30-55/logs/lightning_logs/version_0/checkpoints/last.ckpt"
 # MODEL_CHECKPOINT="/raid/R12K41024/BCCTN/outputs/2025-05-16/04-19-55/logs/lightning_logs/version_0/checkpoints/epoch=98-step=95832.ckpt"
-MODEL_CHECKPOINT="/raid/R12K41024/LBCCN/outputs/2025-05-21/14-10-34/logs/lightning_logs/version_0/checkpoints/epoch=194-step=671190.ckpt"
+MODEL_CHECKPOINT="/raid/R12K41024/LBCCN/outputs/2025-05-24/21-41-36/logs/lightning_logs/version_0/checkpoints/epoch=50-step=175542.ckpt"
 
 
 # VCTK_NOISY_DIR="/raid/R12K41024/BCCTN/Dataset/noisy_testset"

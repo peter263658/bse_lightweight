@@ -66,7 +66,7 @@ class BaseTrainer(pl.Trainer):
         #     log_every_n_steps=400, enable_progress_bar=True, detect_anomaly=False)
         trainer_kwargs = dict(
             max_epochs=n_epochs,
-            callbacks=[progress_bar, checkpoint_callback],
+            callbacks=[progress_bar, early_stopping, checkpoint_callback],
             logger=[tb_logger],
             accelerator=accelerator or ("gpu" if torch.cuda.is_available() else "cpu"),
             devices=max(1, gpu_count),

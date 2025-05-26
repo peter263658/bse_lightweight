@@ -25,7 +25,7 @@ class Stft(nn.Module):
 
         y = torch.stft(x, self.n_dft, hop_length=self.hop_size,
                        win_length=self.win_length, onesided=self.onesided,
-                       return_complex=True, window=window, normalized=True)
+                       return_complex=True, window=window, normalized=False)
 
         if not self.is_complex:
             y = torch.view_as_real(y)
@@ -42,7 +42,7 @@ class IStft(Stft):
 
         y = torch.istft(x, self.n_dft, hop_length=self.hop_size,
                         win_length=self.win_length, onesided=self.onesided,
-                        window=window,normalized=True)
+                        window=window,normalized=False)
 
         return y
 

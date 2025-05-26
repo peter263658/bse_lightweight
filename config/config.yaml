@@ -13,10 +13,10 @@ model:
   band_num: 40
 
 loss:
-  ild_weight: 1        # Weight for ILD loss (γ)
-  ipd_weight: 10       # Weight for IPD loss (κ)
-  snr_loss_weight: 1   # Weight for SNR loss (α)
-  stoi_weight: 10      # Weight for STOI loss (β)
+  ild_weight: 0.5        # Weight for ILD loss (γ)
+  ipd_weight: 5       # Weight for IPD loss (κ)
+  snr_loss_weight: 0.5   # Weight for SNR loss (α)
+  stoi_weight: 5      # Weight for STOI loss (β)
 
 # 評估階段用的 checkpoint（正式 train 完再填）
 eval:
@@ -27,14 +27,14 @@ training:
   batch_size: 32
   # learning_rate: 0.001  # Initial learning rate as per paper
   learning_rate: 0.0001  # Initial learning rate as per paper
-  learning_rate_decay_steps: [3, 8]
+  learning_rate_decay_steps: [100, 200]
   learning_rate_decay_values: 0.5
   n_epochs: 300         # Number of epochs as per paper
   n_workers: 4
   pin_memory: true
   strategy: auto
   train_checkpoint_path: null
-  logger: true
+  logger: true 
   early_stopping:
     enabled: true
     key_to_monitor: validation_loss
